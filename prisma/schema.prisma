@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Source {
+  id            String     @id @default(cuid())
+  url           String
+  label         String?
+  criteria      String     @default("[]")
+  createdAt     DateTime   @default(now())
+  lastCrawledAt DateTime?
+  crawlRuns     CrawlRun[]
+  offers        Offer[]
+}
+
+model CrawlRun {
+  id         String    @id @default(cuid())
+  sourceId   String
+  source     Source    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  status     String    @default("pending")
+  error      String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  offers     Offer[]
+}
+
+model Offer {
+  id              String   @id @default(cuid())
+  crawlRunId      String
+  crawlRun        CrawlRun @relation(fields: [crawlRunId], references: [id], onDelete: Cascade)
+  sourceId        String
+  source          Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  cardName        String
+  issuer          String
+  annualFee       String?
+  signupBonus     String?
+  apr             String?
+  rewardsSummary  String?
+  perks           String   @default("[]")
+  rawSummary      String
+  relevanceScore  Int      @default(0)
+  matchedCriteria String   @default("[]")
+  createdAt       DateTime @default(now())
+}
