@@ -99,6 +99,12 @@ server.registerTool(
         totalChars: page.totalChars,
         keywordFocused: page.keywordFocused,
         text: page.excerpt,
+        ...(page.totalChars < 300
+          ? {
+              warning:
+                "Almost no text: the page is probably rendered with JavaScript or blocked. Try mode \"full\", your own web fetch tool, or tell the user the page can't be read automatically.",
+            }
+          : {}),
         ...(includeLinks ? { links: extractLinks(page.html, url) } : {}),
       };
     })

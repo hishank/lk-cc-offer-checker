@@ -15,13 +15,15 @@ export interface ConfiguredSource {
   criteria?: string[];
 }
 
-// TODO: replace these with the offer pages you want to track. The URLs below
-// are placeholders and have not been verified; check each one in a browser.
+// Verified Nov 2026:
+// - combank: plain HTML, all offers readable by fetch_page.
+// - hnb / sampath: offers are loaded with JavaScript, so fetch_page sees an
+//   empty page. Claude can only read them with a tool that renders JS.
 export const SOURCES: ConfiguredSource[] = [
   {
     key: "combank",
     label: "Commercial Bank – Card offers",
-    url: "https://www.combank.lk/rewards-promotion",
+    url: "https://www.combank.lk/rewards-promotions",
   },
   {
     key: "hnb",

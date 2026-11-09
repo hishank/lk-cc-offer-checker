@@ -5,18 +5,27 @@ const FETCH_TIMEOUT_MS = 15_000;
 
 import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
+import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
+
+const hasProxyEnv = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"].some(
+  (name) => process.env[name]
+);
+// Honour HTTP(S)_PROXY / NO_PROXY when set (Node's global fetch ignores them,
+// and loading jsdom replaces the global dispatcher anyway).
+const proxyAgent = hasProxyEnv ? new EnvHttpProxyAgent() : undefined;
 
 export async function fetchPage(url: string): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(url, {
+    const response = await undiciFetch(url, {
       headers: {
         "User-Agent": USER_AGENT,
         Accept: "text/html,application/xhtml+xml",
       },
       signal: controller.signal,
+      dispatcher: proxyAgent,
     });
 
     if (!response.ok) {
@@ -27,6 +36,10 @@ export async function fetchPage(url: string): Promise<string> {
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       throw new Error("Request timed out after 15 seconds");
+    }
+    const cause = (error as { cause?: { code?: string; message?: string } }).cause;
+    if (cause) {
+      throw new Error(`Could not reach ${new URL(url).hostname}: ${cause.code ?? cause.message}`);
     }
     throw error;
   } finally {
