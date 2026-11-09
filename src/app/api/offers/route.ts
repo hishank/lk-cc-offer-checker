@@ -1,29 +1,17 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { getLatestOffers } from "@/lib/offers";
 
+/** Current offers. Query params: q (comma-separated keywords), source, category, limit. */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const sourceId = searchParams.get("sourceId") ?? undefined;
-  const minScore = searchParams.get("minScore");
-  const limit = searchParams.get("limit");
+  const limit = Number(searchParams.get("limit")) || undefined;
 
-  const offers = await db.offer.findMany({
-    where: {
-      ...(sourceId ? { sourceId } : {}),
-      ...(minScore ? { relevanceScore: { gte: Number(minScore) } } : {}),
-    },
-    include: {
-      source: { select: { url: true, label: true } },
-    },
-    orderBy: [{ relevanceScore: "desc" }, { createdAt: "desc" }],
-    take: limit ? Number(limit) : undefined,
+  const offers = await getLatestOffers({
+    keywords: (searchParams.get("q") ?? "").split(",").filter(Boolean),
+    source: searchParams.get("source") ?? undefined,
+    category: searchParams.get("category") ?? undefined,
+    limit,
   });
 
-  return NextResponse.json(
-    offers.map((offer) => ({
-      ...offer,
-      perks: JSON.parse(offer.perks) as string[],
-      matchedCriteria: JSON.parse(offer.matchedCriteria) as string[],
-    }))
-  );
+  return NextResponse.json(offers);
 }

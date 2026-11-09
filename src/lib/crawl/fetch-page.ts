@@ -53,4 +53,61 @@ export function extractMainText(html: string, url: string): string {
   );
 }
 
+import { selectRelevantText } from "./select-relevant-text";
+
 export { selectRelevantText, truncateText } from "./select-relevant-text";
+
+export interface PageTextOptions {
+  keywords?: string[];
+  maxChars?: number;
+  /** "readable" uses Readability (article text); "full" keeps all visible text. */
+  mode?: "readable" | "full";
+}
+
+/** Visible text of the whole document (scripts/styles/nav chrome removed). */
+export function extractFullText(html: string, url: string): string {
+  const dom = new JSDOM(html, { url });
+  const doc = dom.window.document;
+  doc.querySelectorAll("script, style, noscript, svg, iframe").forEach((el) => el.remove());
+  const blocks = doc.querySelectorAll(
+    "h1, h2, h3, h4, h5, h6, p, li, td, th, dt, dd, a, span, div"
+  );
+  // Insert line breaks between block-ish elements so offers don't run together.
+  blocks.forEach((el) => el.append(doc.createTextNode("\n")));
+  return (doc.body?.textContent ?? "")
+    .replace(/[ \t\u00a0]+/g, " ")
+    .replace(/\s*\n\s*/g, "\n")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
+/** Links on the page (useful for following individual offer detail pages). */
+export function extractLinks(html: string, url: string, limit = 150) {
+  const dom = new JSDOM(html, { url });
+  const seen = new Set<string>();
+  const links: { text: string; href: string }[] = [];
+  for (const a of dom.window.document.querySelectorAll("a[href]")) {
+    const href = (a as HTMLAnchorElement).href;
+    const text = a.textContent?.replace(/\s+/g, " ").trim() ?? "";
+    if (!href.startsWith("http") || seen.has(href) || !text) continue;
+    seen.add(href);
+    links.push({ text: text.slice(0, 120), href });
+    if (links.length >= limit) break;
+  }
+  return links;
+}
+
+/** Fetch a page and return its text, focused on keywords when large. */
+export async function getPageText(
+  url: string,
+  keywordsOrOptions: string[] | PageTextOptions = []
+) {
+  const options = Array.isArray(keywordsOrOptions)
+    ? { keywords: keywordsOrOptions }
+    : keywordsOrOptions;
+  const html = await fetchPage(url);
+  const text =
+    options.mode === "full" ? extractFullText(html, url) : extractMainText(html, url);
+  const selected = selectRelevantText(text, options.keywords ?? [], options.maxChars);
+  return { ...selected, totalChars: text.length, html };
+}

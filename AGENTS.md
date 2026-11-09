@@ -4,55 +4,41 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# CC Offers Crawler — Agent Instructions
+# CC Offers — Agent Instructions
 
-When the user asks for credit card offers (e.g. "give me hotel offers", "find travel cards", "what bonuses are available"), **run the crawl CLI** and return the markdown output directly in chat.
+This repo ships an MCP server (`cc-offers`, configured in `.mcp.json`). Claude does the research through it and the web app (`npm run dev`, http://localhost:3000) shows the results.
 
-## Commands
+## Sources
 
-List configured source URLs:
+Offer pages are constants in `src/config/sources.ts`. To add/remove/update a site, edit that file (keep `key` stable when only the URL changes). The DB is synced from it automatically.
+
+## When the user asks to refresh / find offers
+
+1. `list_sources`
+2. For each source: `fetch_page` (use `mode: "full"` for listing pages if `readable` misses offers; `includeLinks: true` to follow detail pages), extract **every** offer on the page
+3. `save_source_offers` once per source with the complete list (replaces that source's current offers)
+4. Summarise in chat (card/offer, bank, benefit, validity) and point to http://localhost:3000/offers
+
+To answer questions about stored offers without re-crawling, use `search_offers`.
+
+## When the user gives a link to compare (or asks to process pending comparisons)
+
+1. Links queued in the app: `list_comparison_requests`. A link pasted in chat: use it directly (no id).
+2. `fetch_page` the link and list its offers
+3. `search_offers` by merchant names, categories and banks to find related stored offers
+4. `save_comparison` with `pageOffers` and every `overlap` (`same` / `similar` / `competing`, shared points, differences, verdict). Pass the request `id` when completing a queued request.
+5. If the page can't be read: `mark_comparison_failed`
+6. Reply with the key overlaps and the `viewAt` link
+
+`fetch_page` does not run JavaScript; if a page comes back nearly empty, use your own web fetch tool instead and save results the same way.
+
+Only record details stated on the page; use null when unknown.
+
+## Without MCP (OpenAI fallback)
 
 ```bash
 npm run agent:crawl -- --list-sources
-```
-
-Crawl all saved sources and return matching offers (default — always re-crawl for fresh results):
-
-```bash
-npm run agent:crawl -- --keywords hotel
-npm run agent:crawl -- --keywords hotel,travel,no annual fee
-```
-
-Use stored offers only (skip re-crawl, faster):
-
-```bash
-npm run agent:crawl -- --keywords hotel --cached
-```
-
-Filter to specific sources by label/URL:
-
-```bash
-npm run agent:crawl -- --keywords hotel --source chase
-```
-
-JSON output (for parsing):
-
-```bash
+npm run agent:crawl -- --keywords hotel,travel   # crawl with OpenAI (needs OPENAI_API_KEY)
+npm run agent:crawl -- --keywords hotel --cached # stored offers only
 npm run agent:crawl -- --keywords hotel --json
 ```
-
-## Workflow
-
-1. User asks for offers with keywords (hotel, travel, cashback, etc.)
-2. Run `npm run agent:crawl -- --keywords <terms>` from the project root
-3. Paste the CLI markdown output into your reply — summarize if long, but include key details (card name, bonus, fee, score)
-4. If the command fails with "No sources configured", tell the user to add URLs at `/sources` in the app first
-5. If `OPENAI_API_KEY` is missing, tell the user to add it to `.env.local`
-
-## Notes
-
-- Sources and criteria are persisted in SQLite — the user configures URLs once in the web UI
-- `--keywords` merges with each source's saved criteria during crawl scoring
-- Always prefer a fresh crawl (`--keywords` without `--cached`) unless the user asks for cached/stored results only
-- General listing URLs (e.g. `/card-offers/`) work reliably: the crawler scans the full page for keyword matches and sends those sections to the AI, not just the top of the page
-- Requires `OPENAI_API_KEY` in `.env.local` for fresh crawls

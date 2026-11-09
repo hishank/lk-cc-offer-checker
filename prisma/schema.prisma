@@ -9,6 +9,8 @@ datasource db {
 
 model Source {
   id            String     @id @default(cuid())
+  /// Stable key from src/config/sources.ts (null for legacy UI-added sources)
+  key           String?    @unique
   url           String
   label         String?
   criteria      String     @default("[]")
@@ -23,6 +25,8 @@ model CrawlRun {
   sourceId   String
   source     Source    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   status     String    @default("pending")
+  /// "openai" (in-app crawl) or "claude" (saved by Claude via MCP)
+  method     String    @default("openai")
   error      String?
   startedAt  DateTime  @default(now())
   finishedAt DateTime?
@@ -42,8 +46,29 @@ model Offer {
   apr             String?
   rewardsSummary  String?
   perks           String   @default("[]")
+  category        String?
+  validity        String?
+  offerUrl        String?
   rawSummary      String
   relevanceScore  Int      @default(0)
   matchedCriteria String   @default("[]")
   createdAt       DateTime @default(now())
+}
+
+/// A link submitted for Claude to survey and compare against stored offers.
+model Comparison {
+  id          String    @id @default(cuid())
+  url         String
+  note        String?
+  /// "pending" | "done" | "failed"
+  status      String    @default("pending")
+  title       String?
+  summary     String?
+  /// JSON array of offers found on the page
+  pageOffers  String    @default("[]")
+  /// JSON array of overlaps between page offers and stored offers
+  overlaps    String    @default("[]")
+  error       String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
 }

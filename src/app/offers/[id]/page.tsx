@@ -23,7 +23,7 @@ export default async function OfferPage({ params }: OfferPageProps) {
 
   const offer = await db.offer.findUnique({
     where: { id },
-    include: { source: true },
+    include: { source: true, crawlRun: { select: { method: true } } },
   });
 
   if (!offer) {
@@ -35,8 +35,8 @@ export default async function OfferPage({ params }: OfferPageProps) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
-      <Link href="/" className={cn(buttonVariants({ variant: "ghost" }))}>
-        ← Back to dashboard
+      <Link href="/offers" className={cn(buttonVariants({ variant: "ghost" }))}>
+        ← All offers
       </Link>
 
       <div className="space-y-2">
@@ -61,10 +61,13 @@ export default async function OfferPage({ params }: OfferPageProps) {
           <CardTitle>Offer details</CardTitle>
           <CardDescription>
             Extracted on {formatDate(offer.createdAt)}
+            {offer.crawlRun.method === "claude" ? " by Claude" : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <DetailRow label="Signup bonus" value={offer.signupBonus} />
+          <DetailRow label="Category" value={offer.category} />
+          <DetailRow label="Benefit / bonus" value={offer.signupBonus} />
+          <DetailRow label="Valid" value={offer.validity} />
           <DetailRow label="Annual fee" value={offer.annualFee} />
           <DetailRow label="APR" value={offer.apr} />
           <DetailRow label="Rewards" value={offer.rewardsSummary} />
@@ -95,7 +98,7 @@ export default async function OfferPage({ params }: OfferPageProps) {
         </CardHeader>
         <CardContent>
           <a
-            href={offer.source.url}
+            href={offer.offerUrl ?? offer.source.url}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-sm hover:underline"

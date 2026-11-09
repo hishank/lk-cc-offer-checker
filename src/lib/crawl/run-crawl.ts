@@ -1,7 +1,10 @@
 import { db } from "@/lib/db";
 import { parseCriteria } from "@/lib/parse-criteria";
 import { extractOffersFromUrl } from "@/lib/crawl/extract-offers";
+import { saveOffersForSource } from "@/lib/offers";
+import { syncConfiguredSources } from "@/lib/sources";
 
+/** In-app crawl: fetch the page and extract offers with OpenAI. */
 export async function crawlSource(
   sourceId: string,
   options?: { criteria?: string[] }
@@ -12,77 +15,29 @@ export async function crawlSource(
   }
 
   const crawlRun = await db.crawlRun.create({
-    data: {
-      sourceId: source.id,
-      status: "running",
-    },
+    data: { sourceId: source.id, status: "running", method: "openai" },
   });
 
   try {
     const criteria = options?.criteria ?? parseCriteria(source.criteria);
     const offers = await extractOffersFromUrl(source.url, criteria);
-
-    if (offers.length === 0) {
-      await db.crawlRun.update({
-        where: { id: crawlRun.id },
-        data: {
-          status: "success",
-          finishedAt: new Date(),
-        },
-      });
-      await db.source.update({
-        where: { id: source.id },
-        data: { lastCrawledAt: new Date() },
-      });
-      return { crawlRunId: crawlRun.id, offersFound: 0 };
-    }
-
-    await db.offer.createMany({
-      data: offers.map((offer) => ({
-        crawlRunId: crawlRun.id,
-        sourceId: source.id,
-        cardName: offer.cardName,
-        issuer: offer.issuer,
-        annualFee: offer.annualFee,
-        signupBonus: offer.signupBonus,
-        apr: offer.apr,
-        rewardsSummary: offer.rewardsSummary,
-        perks: JSON.stringify(offer.perks),
-        rawSummary: offer.summary,
-        relevanceScore: offer.relevanceScore,
-        matchedCriteria: JSON.stringify(offer.matchedCriteria),
-      })),
+    return await saveOffersForSource(source.id, offers, {
+      method: "openai",
+      criteria,
+      crawlRunId: crawlRun.id,
     });
-
-    await db.crawlRun.update({
-      where: { id: crawlRun.id },
-      data: {
-        status: "success",
-        finishedAt: new Date(),
-      },
-    });
-
-    await db.source.update({
-      where: { id: source.id },
-      data: { lastCrawledAt: new Date() },
-    });
-
-    return { crawlRunId: crawlRun.id, offersFound: offers.length };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown crawl error";
     await db.crawlRun.update({
       where: { id: crawlRun.id },
-      data: {
-        status: "failed",
-        error: message,
-        finishedAt: new Date(),
-      },
+      data: { status: "failed", error: message, finishedAt: new Date() },
     });
     throw error;
   }
 }
 
 export async function crawlAllSources() {
+  await syncConfiguredSources();
   const sources = await db.source.findMany({ orderBy: { createdAt: "asc" } });
   const results = [];
 

@@ -9,6 +9,15 @@ export const extractedOfferSchema = z.object({
   rewardsSummary: z.string().nullable(),
   perks: z.array(z.string()),
   summary: z.string(),
+  category: z
+    .string()
+    .nullable()
+    .describe("Offer type, e.g. dining, hotel, travel, fuel, shopping, cashback"),
+  validity: z
+    .string()
+    .nullable()
+    .describe("Validity period as stated, e.g. 'Until 31 Dec 2026'"),
+  offerUrl: z.string().nullable().describe("Direct link to the offer, if shown"),
 });
 
 export const extractionResultSchema = z.object({
@@ -24,7 +33,8 @@ export interface ScoredOffer extends ExtractedOffer {
 
 export function scoreOffers(
   offers: ExtractedOffer[],
-  criteria: string[]
+  criteria: string[],
+  options: { keepUnmatched?: boolean } = {}
 ): ScoredOffer[] {
   const normalizedCriteria = criteria
     .map((c) => c.trim().toLowerCase())
@@ -40,6 +50,7 @@ export function scoreOffers(
         offer.apr,
         offer.rewardsSummary,
         offer.summary,
+        offer.category,
         ...offer.perks,
       ]
         .filter(Boolean)
@@ -82,8 +93,11 @@ export function scoreOffers(
         matchedCriteria,
       };
     })
-    .filter((offer) =>
-      normalizedCriteria.length === 0 ? true : offer.relevanceScore > 0
+    .filter(
+      (offer) =>
+        options.keepUnmatched ||
+        normalizedCriteria.length === 0 ||
+        offer.relevanceScore > 0
     )
     .sort((a, b) => b.relevanceScore - a.relevanceScore);
 }

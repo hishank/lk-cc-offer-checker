@@ -1,7 +1,6 @@
-import { db } from "@/lib/db";
-import { parseJsonArray } from "@/lib/format";
-import { SourceForm } from "@/components/source-form";
+import { connection } from "next/server";
 import { SourcesTable } from "@/components/sources-table";
+import { toSourceRow } from "@/lib/source-row";
 import {
   Card,
   CardContent,
@@ -9,63 +8,33 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getSourcesWithCounts } from "@/lib/sources";
 
-interface SourcesPageProps {
-  searchParams: Promise<{ edit?: string }>;
-}
-
-export default async function SourcesPage({ searchParams }: SourcesPageProps) {
-  const { edit } = await searchParams;
-
-  const sources = await db.source.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { _count: { select: { offers: true } } },
-  });
-
-  const editingSource = edit
-    ? sources.find((source) => source.id === edit)
-    : undefined;
-
-  const sourceRows = sources.map((source) => ({
-    id: source.id,
-    url: source.url,
-    label: source.label,
-    criteria: parseJsonArray(source.criteria),
-    lastCrawledAt: source.lastCrawledAt?.toISOString() ?? null,
-    offerCount: source._count.offers,
-  }));
+export default async function SourcesPage() {
+  await connection();
+  const sources = await getSourcesWithCounts();
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Sources</h1>
         <p className="text-muted-foreground">
-          Add offer page URLs and optional keywords to filter relevant results.
+          Offer pages are defined in{" "}
+          <code className="rounded bg-muted px-1 font-mono text-sm">src/config/sources.ts</code>.
+          Edit that file to add, remove or update a URL when a bank changes its site — keep
+          the <code className="font-mono">key</code> the same to preserve history.
         </p>
       </div>
 
-      <SourceForm
-        initial={
-          editingSource
-            ? {
-                id: editingSource.id,
-                url: editingSource.url,
-                label: editingSource.label,
-                criteria: parseJsonArray(editingSource.criteria),
-              }
-            : undefined
-        }
-      />
-
       <Card>
         <CardHeader>
-          <CardTitle>Your sources</CardTitle>
+          <CardTitle>Configured sources</CardTitle>
           <CardDescription>
-            Crawl individual pages or use Crawl all from the dashboard.
+            Ask Claude to refresh offers, or use Crawl to extract with OpenAI.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <SourcesTable sources={sourceRows} />
+          <SourcesTable sources={sources.map(toSourceRow)} />
         </CardContent>
       </Card>
     </div>

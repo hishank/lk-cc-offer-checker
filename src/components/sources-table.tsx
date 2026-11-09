@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { ExternalLink, Loader2, Play, Trash2 } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -15,22 +14,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import type { SourceRow } from "@/lib/source-row";
 
-export interface SourceRow {
-  id: string;
-  url: string;
-  label: string | null;
-  criteria: string[];
-  lastCrawledAt: string | null;
-  offerCount: number;
-}
+export type { SourceRow };
 
 interface SourcesTableProps {
   sources: SourceRow[];
+  compact?: boolean;
 }
 
-export function SourcesTable({ sources }: SourcesTableProps) {
+export function SourcesTable({ sources, compact = false }: SourcesTableProps) {
   const router = useRouter();
   const [crawlingId, setCrawlingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -64,7 +57,7 @@ export function SourcesTable({ sources }: SourcesTableProps) {
   if (sources.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No sources yet. Add a URL above to get started.
+        No sources configured. Add them to src/config/sources.ts.
       </p>
     );
   }
@@ -74,7 +67,7 @@ export function SourcesTable({ sources }: SourcesTableProps) {
       <TableHeader>
         <TableRow>
           <TableHead>Source</TableHead>
-          <TableHead>Criteria</TableHead>
+          {!compact && <TableHead>Criteria</TableHead>}
           <TableHead>Last crawled</TableHead>
           <TableHead>Offers</TableHead>
           <TableHead className="text-right">Actions</TableHead>
@@ -87,6 +80,11 @@ export function SourcesTable({ sources }: SourcesTableProps) {
               <div className="space-y-1">
                 <p className="font-medium">
                   {source.label || new URL(source.url).hostname}
+                  {!source.key && (
+                    <Badge variant="outline" className="ml-2 text-xs">
+                      not in config
+                    </Badge>
+                  )}
                 </p>
                 <a
                   href={source.url}
@@ -99,6 +97,7 @@ export function SourcesTable({ sources }: SourcesTableProps) {
                 </a>
               </div>
             </TableCell>
+            {!compact && (
             <TableCell>
               <div className="flex flex-wrap gap-1">
                 {source.criteria.length === 0 ? (
@@ -112,6 +111,7 @@ export function SourcesTable({ sources }: SourcesTableProps) {
                 )}
               </div>
             </TableCell>
+            )}
             <TableCell className="text-sm">
               {formatDate(source.lastCrawledAt)}
             </TableCell>
@@ -131,12 +131,7 @@ export function SourcesTable({ sources }: SourcesTableProps) {
                   )}
                   Crawl
                 </Button>
-                <Link
-                  href={`/sources?edit=${source.id}`}
-                  className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-                >
-                  Edit
-                </Link>
+                {!source.key && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -149,6 +144,7 @@ export function SourcesTable({ sources }: SourcesTableProps) {
                     <Trash2 className="size-4" />
                   )}
                 </Button>
+                )}
               </div>
             </TableCell>
           </TableRow>

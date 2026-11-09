@@ -1,15 +1,15 @@
 # CC Offers Crawler
 
-A local web app to crawl credit card offer pages, extract structured deal details with AI, and filter results by your search criteria.
+A local web app that tracks credit card offers from a fixed list of bank pages. Claude does the research through an MCP server; the app shows every current offer in one view and lets you queue links for Claude to compare against what you track.
 
 ## Features
 
-- Add offer page URLs (bank promos, comparison sites, etc.)
-- Set optional keyword criteria (e.g. `travel`, `no annual fee`, `$500 bonus`)
-- Crawl on demand — per source or all at once
-- AI extracts card name, issuer, bonus, APR, annual fee, rewards, and perks
-- Relevance scoring based on your criteria
-- Browse offer history stored in local SQLite
+- Sources defined as constants in `src/config/sources.ts` — edit the file when a bank changes its site
+- **All offers** view (`/offers`): every current offer across sources, with search, source and category filters
+- **Compare** (`/compare`): give a link; Claude surveys the page and shows which offers overlap with the ones you track (same / similar / competing), what differs, and a verdict
+- MCP server so Claude (Claude Code or Claude Desktop) does the fetching, extraction and comparison
+- Optional in-app crawling with OpenAI (`Crawl` / `Crawl all`)
+- History stored in local SQLite
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@ A local web app to crawl credit card offer pages, extract structured deal detail
 npm install
 ```
 
-2. Copy environment file and add your OpenAI key:
+2. Copy the environment file (the OpenAI key is only needed for in-app crawling):
 
 ```bash
 cp .env.example .env.local
@@ -53,12 +53,55 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Usage
+## Configuring sources
 
-1. Go to **Sources** and add a credit card offer page URL.
-2. Optionally add comma-separated criteria to filter results.
-3. Click **Crawl** on a source, or **Crawl all** from the dashboard.
-4. Review extracted offers on the dashboard — click any offer for full details.
+Edit `src/config/sources.ts`:
+
+```ts
+export const SOURCES: ConfiguredSource[] = [
+  { key: "hnb", label: "HNB – Card promotions", url: "https://www.hnb.lk/...", criteria: ["hotel"] },
+];
+```
+
+- Change `url` (keep `key`) when a bank moves its page — offer history is kept.
+- Removing an entry removes that source and its offers.
+- The app, CLI and MCP server pick up changes automatically.
+
+## Using Claude (MCP)
+
+The MCP server lives in `scripts/mcp-server.ts` and exposes these tools:
+
+| Tool | Purpose |
+|------|---------|
+| `list_sources` | Configured sources |
+| `fetch_page` | Fetch a page's text (readable or full, optional links) |
+| `save_source_offers` | Save the current offers Claude extracted for a source |
+| `search_offers` | Query current offers |
+| `list_comparison_requests` | Links queued from the Compare page |
+| `save_comparison` / `mark_comparison_failed` | Store a comparison result |
+
+It also provides two prompts, `refresh_offers` and `compare_link`.
+
+**Claude Code:** open this repo — `.mcp.json` registers the server (approve it when prompted). Then ask:
+
+- "Refresh my credit card offers"
+- "Process my pending offer comparisons"
+- "Compare the offers on https://… with mine"
+
+**Claude Desktop:** add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "cc-offers": {
+      "command": "npm",
+      "args": ["--prefix", "/absolute/path/to/lk-cc-offer-checker", "run", "--silent", "mcp"]
+    }
+  }
+}
+```
+
+Keep `npm run dev` running to see the results at http://localhost:3000.
 
 ## Notes
 
@@ -67,9 +110,9 @@ Open [http://localhost:3000](http://localhost:3000).
 - Always verify offer details on the source page — AI extraction can miss or misread details.
 - Data is stored locally in `dev.db` at the project root (gitignored).
 
-## Agent / Cursor CLI
+## CLI (OpenAI fallback)
 
-Ask Cursor to find offers for you, or run manually from the terminal:
+Run manually from the terminal:
 
 ```bash
 # List saved source URLs
@@ -85,7 +128,7 @@ npm run agent:crawl -- --keywords hotel,travel,no annual fee
 npm run agent:crawl -- --keywords hotel --cached
 ```
 
-Cursor will run these commands when you ask things like "give me all hotel offers" — sources must be configured in the app first.
+Fresh crawls need `OPENAI_API_KEY`; `--cached` works without it.
 
 ## Scripts
 
@@ -93,5 +136,6 @@ Cursor will run these commands when you ask things like "give me all hotel offer
 |---------|-------------|
 | `npm run dev` | Start development server |
 | `npm run build` | Production build |
-| `npm run agent:crawl` | Crawl saved sources and query offers (for agents/CLI) |
+| `npm run agent:crawl` | Crawl sources with OpenAI and query offers (CLI) |
+| `npm run mcp` | Start the MCP server (stdio) |
 | `npx prisma studio` | Browse database in browser |

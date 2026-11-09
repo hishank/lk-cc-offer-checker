@@ -10,8 +10,12 @@ export interface OfferResult {
   rewardsSummary: string | null;
   perks: string[];
   rawSummary: string;
+  category: string | null;
+  validity: string | null;
+  offerUrl: string | null;
   relevanceScore: number;
   matchedCriteria: string[];
+  sourceKey: string | null;
   sourceUrl: string;
   sourceLabel: string | null;
   crawledAt: string;
@@ -28,10 +32,13 @@ export function offerFromDb(
     rewardsSummary: string | null;
     perks: string;
     rawSummary: string;
+    category: string | null;
+    validity: string | null;
+    offerUrl: string | null;
     relevanceScore: number;
     matchedCriteria: string;
     createdAt: Date;
-    source: { url: string; label: string | null };
+    source: { key: string | null; url: string; label: string | null };
   }
 ): OfferResult {
   return {
@@ -44,8 +51,12 @@ export function offerFromDb(
     rewardsSummary: offer.rewardsSummary,
     perks: parseCriteria(offer.perks),
     rawSummary: offer.rawSummary,
+    category: offer.category,
+    validity: offer.validity,
+    offerUrl: offer.offerUrl,
     relevanceScore: offer.relevanceScore,
     matchedCriteria: parseCriteria(offer.matchedCriteria),
+    sourceKey: offer.source.key,
     sourceUrl: offer.source.url,
     sourceLabel: offer.source.label,
     crawledAt: offer.createdAt.toISOString(),
@@ -71,6 +82,8 @@ export function formatOffersMarkdown(
     lines.push(`## ${offer.cardName}`);
     lines.push(`- **Issuer:** ${offer.issuer}`);
     lines.push(`- **Relevance score:** ${offer.relevanceScore}`);
+    if (offer.category) lines.push(`- **Category:** ${offer.category}`);
+    if (offer.validity) lines.push(`- **Valid:** ${offer.validity}`);
     if (offer.signupBonus) lines.push(`- **Signup bonus:** ${offer.signupBonus}`);
     if (offer.annualFee) lines.push(`- **Annual fee:** ${offer.annualFee}`);
     if (offer.apr) lines.push(`- **APR:** ${offer.apr}`);
@@ -82,7 +95,7 @@ export function formatOffersMarkdown(
       lines.push(`- **Matched:** ${offer.matchedCriteria.join(", ")}`);
     }
     lines.push(`- **Source:** ${offer.sourceLabel ?? offer.sourceUrl}`);
-    lines.push(`- **URL:** ${offer.sourceUrl}`);
+    lines.push(`- **URL:** ${offer.offerUrl ?? offer.sourceUrl}`);
     lines.push(`- **Summary:** ${offer.rawSummary}`);
     lines.push("");
   }
