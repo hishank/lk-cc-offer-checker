@@ -64,13 +64,26 @@ async function getSources(sourceFilter?: string) {
 }
 
 async function queryCachedOffers(keywords: string[]): Promise<OfferResult[]> {
+  // Newest first, so every re-crawl supersedes older copies of the same offer.
   const offers = await db.offer.findMany({
     include: { source: { select: { url: true, label: true } } },
-    orderBy: [{ relevanceScore: "desc" }, { createdAt: "desc" }],
-    take: 100,
+    orderBy: { createdAt: "desc" },
+    take: 500,
   });
 
-  return offers
+  const seen = new Set<string>();
+  const latest = offers.filter((offer) => {
+    const key = [offer.sourceId, offer.cardName, offer.issuer]
+      .map((part) => part.trim().toLowerCase())
+      .join("\u0000");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return latest
+    .sort((a, b) => b.relevanceScore - a.relevanceScore)
+    .slice(0, 100)
     .map(offerFromDb)
     .filter((offer) => offerMatchesKeywords(offer, keywords));
 }

@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
 export async function GET() {
+  await connection();
   const sources = await db.source.findMany({
     orderBy: { createdAt: "desc" },
     include: {

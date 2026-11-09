@@ -13,7 +13,7 @@ A local web app to crawl credit card offer pages, extract structured deal detail
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22.22+ (or 24.15+)
 - An OpenAI API key
 
 ## Setup
@@ -35,6 +35,8 @@ Edit `.env.local`:
 ```
 OPENAI_API_KEY=sk-your-key-here
 DATABASE_URL="file:./dev.db"
+# Optional: override the extraction model (default: gpt-4o-mini)
+# OPENAI_MODEL=gpt-4o-mini
 ```
 
 3. Run database migration:
@@ -63,7 +65,7 @@ Open [http://localhost:3000](http://localhost:3000).
 - Crawling uses fetch + HTML parsing. JavaScript-heavy pages may fail with a clear error.
 - General listing pages (e.g. a bank's `/card-offers/` index) are supported: when keywords are set, the crawler scans the full page and extracts sections matching those terms before sending to the AI.
 - Always verify offer details on the source page — AI extraction can miss or misread details.
-- Data is stored locally in `prisma/dev.db`.
+- Data is stored locally in `dev.db` at the project root (gitignored).
 
 ## Agent / Cursor CLI
 

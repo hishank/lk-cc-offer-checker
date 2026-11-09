@@ -1,5 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import {
   extractMainText,
   fetchPage,
@@ -15,6 +15,8 @@ const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const MODEL_ID = process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
+
 export async function extractOffersFromUrl(
   url: string,
   criteria: string[]
@@ -27,9 +29,9 @@ export async function extractOffersFromUrl(
     ? `\nNote: This is a large listing page. Content below was selected from sections matching: ${criteria.join(", ")}. Extract every distinct offer visible in these sections.\n`
     : "";
 
-  const { object } = await generateObject({
-    model: openai("gpt-4o-mini"),
-    schema: extractionResultSchema,
+  const { output } = await generateText({
+    model: openai(MODEL_ID),
+    output: Output.object({ schema: extractionResultSchema }),
     prompt: `You are extracting credit card offers and card-related promotions from a web page.
 
 Source URL: ${url}
@@ -44,5 +46,5 @@ Page content:
 ${excerpt}`,
   });
 
-  return scoreOffers(object.offers, criteria);
+  return scoreOffers(output.offers, criteria);
 }

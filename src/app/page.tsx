@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { db } from "@/lib/db";
 import { parseJsonArray } from "@/lib/format";
 import { CrawlAllButton } from "@/components/crawl-all-button";
@@ -15,6 +16,9 @@ import {
 import { cn } from "@/lib/utils";
 
 export default async function HomePage() {
+  // Data lives in SQLite and changes on every crawl: render per request, not at build time.
+  await connection();
+
   const [sources, offers] = await Promise.all([
     db.source.findMany({
       orderBy: { createdAt: "desc" },
